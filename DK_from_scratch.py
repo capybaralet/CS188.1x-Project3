@@ -98,12 +98,11 @@ def query_fn(s, a, step):
 """
 
 #################################################################
-# learn a probability distribution over states:
-state_probs = []
-
-
-# learn a dirichlet-multinomial probability distribution over states probabilities:
+# TODO: learn a dirichlet-multinomial probability distribution over states probabilities:
 state_posteriors = []
+
+# learn a probability distribution over states (as the softmax of counts)
+state_counts = [10,]*grid_width**2
 
 
 #################################################################
@@ -132,6 +131,8 @@ total_observed_reward = 0
 # TODO: discounting
 # TODO: more policies
 for step in range(nsteps):
+	state_counts[state] += 1
+
 	# this is how the policy would work:
 	action = np.argmax(np.random.multinomial(1, policy[current_state]))
 
