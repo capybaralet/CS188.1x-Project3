@@ -3,24 +3,6 @@ np = numpy
 from collections import OrderedDict
 
 """
-IDEAS for query functions:
-    possible inputs:
-        P(s)
-        P(r | s, a)
-        pi(s)
-
-    want to query more if state might be:
-        high value and reachable
-    want to query more if we're uncertain...
-
-    want to avoid querying inevitable states
-        (e.g. if there were a gate-state right in from of the start-state.)
-        need an environment to test this...)
-
-    we also just care about finding the best action from a given state
-
-
-
 THINGS TO MONITOR:
     learning of everything that is learned:
         Q-function
@@ -50,25 +32,21 @@ QUESTIONS / musings...:
 TODO:
     track uncertainty of Q (or A (advantage function))
     use P(s), P(r | s, a) to make cooler query functions
-
     ------------------------------------------------
     model-based
         PSRL with extra cost for less visited s,a
         Dave has PSRL
         Rmax - query cost (?)
-
-
-
 """
 
 
 # hyper-parameters:
-grid_width = 4
+grid_width = 5
 epsilon = 0.1
-prob_random_move = 0.0
-prob_random_reset = 0.001
+prob_random_move = 0.1
+prob_random_reset = 0.01
 query_cost = .1 # overridden in for loop!
-gamma = .999 # discount factor
+gamma = .9 # discount factor
 prob_zero_reward = .9
 
 learning_rate = .1
@@ -214,21 +192,23 @@ all_results = {}
 for query_cost in [.1, .03, .01]:
     print "\n query_cost=", query_cost, '\n'
     all_results[query_cost] = {}
+    """
     for query_fn_name in query_fns:
         all_results[query_cost][query_fn_name] = {}
         all_results[query_cost][query_fn_name]['total_reward'] = 0
         all_results[query_cost][query_fn_name]['total_observed_reward'] = 0
         all_results[query_cost][query_fn_name]['total_nqueries'] = 0
         all_results[query_cost][query_fn_name]['performance'] = 0
-        for nex in range(4):
-            query_fn = query_fns[query_fn_name]
-            print query_fn_name
-
+        query_fn = query_fns[query_fn_name]
+        print query_fn_name
+    """
+    for query_fn in [lambda x,y,z: True]:
+        for nex in range(20):
             Q_values = [[0,0,0,0,0] for state in states]
             total_r_observed = [[0,0,0,0,0] for state in states] 
             nqueries = [[0,0,0,0,0] for state in states]
 
-            nsteps = 200000
+            nsteps = 50000
             current_state = 0
             total_reward = 0
             total_observed_reward = 0
@@ -277,10 +257,12 @@ for query_cost in [.1, .03, .01]:
             #total_query_cost = query_cost(query_history)
 
             performance = total_reward - total_query_cost
+            """
             all_results[query_cost][query_fn_name]['total_reward'] = updated_running_average(all_results[query_cost][query_fn_name]['total_reward'], total_reward, nex+1)
             all_results[query_cost][query_fn_name]['total_observed_reward'] = updated_running_average(all_results[query_cost][query_fn_name]['total_observed_reward'], total_observed_reward, nex+1)
             all_results[query_cost][query_fn_name]['total_nqueries'] = updated_running_average(all_results[query_cost][query_fn_name]['total_nqueries'], total_nqueries, nex+1)
             all_results[query_cost][query_fn_name]['performance'] = updated_running_average(all_results[query_cost][query_fn_name]['performance'], performance, nex+1)
+            """
 
             if 0:#printing:
                 print "total_reward =", total_reward
