@@ -4,16 +4,16 @@ np = numpy
 """
 TODO:
 
-	implement Q-learning
+    implement Q-learning
 
-	track uncertainty of Q (or A (advantage function))
+    track uncertainty of Q (or A (advantage function))
 
-	learn P(r | s, a)
-	learn P(s)
-	^ use these to make cooler query functions
+    learn P(r | s, a)
+    learn P(s)
+    ^ use these to make cooler query functions
 
-	------------------------------------------------
-	implement PSRL
+    ------------------------------------------------
+    implement PSRL
 
 """
 
@@ -38,65 +38,65 @@ reward_probabilities = np.random.binomial(1, 1 - prob_zero_reward, len(states)) 
 
 ##################################
 def row_and_column(state):
-	return state / grid_width, state % grid_width
+    return state / grid_width, state % grid_width
 
 actions = range(5) # stay, N, E, S, W
 
 def next_state(state, action):
-	row, column = row_and_column(state)
-	if action == 1 and row > 0:
-		return state - grid_width
-	if action == 2 and column < grid_width - 1:
-		return state + 1
-	if action == 3 and row < grid_width - 1:
-		return state + grid_width
-	if action == 4 and column > 0:
-		return state - 1
-	else:
-		return state
+    row, column = row_and_column(state)
+    if action == 1 and row > 0:
+        return state - grid_width
+    if action == 2 and column < grid_width - 1:
+        return state + 1
+    if action == 3 and row < grid_width - 1:
+        return state + grid_width
+    if action == 4 and column > 0:
+        return state - 1
+    else:
+        return state
 
 #################################################################
 # GENERAL functions
 
 def multinomial_entropy(probs): # TODO: stability?
-	return -np.sum(probs * np.log(probs))
+    return -np.sum(probs * np.log(probs))
  
 #################################################################
 # Query functions
 
 # query each time
 def query_fn(s, a, step):
-	return True
+    return True
 
 # query first N times
 max_num_queries = 10000
 def query_fn(s, a, step):
-	return step < max_num_queries
+    return step < max_num_queries
 
 # query first N times in state s
 max_num_queries = 10000 / len(states)
 def query_fn(s, a, step):
-	return sum(nqueries[s]) < max_num_queries
+    return sum(nqueries[s]) < max_num_queries
 
 # query first N times if state s, taking action a
 max_num_queries = 10000 / len(states) / len(actions)
 def query_fn(s, a, step):
-	return nqueries[s][a] < max_num_queries
+    return nqueries[s][a] < max_num_queries
 
 # query with time-dependent probability
 query_probability_decay = .999 # TODO: make this expectation = max_num_queries
 def query_fn(s, a, step):
-	return query_probability_decay**step 
+    return query_probability_decay**step 
 
 # query based on entropy of action probability
 entropy_threshold = 1.5  # TODO: what's a good value here?
 def query_fn(s, a, step):
-	return multinomial_entropy(policy[s]) > entropy_threshold
+    return multinomial_entropy(policy[s]) > entropy_threshold
 
 """
 # TODO: query when expected returns under softmax policy is greater than something... 
 def query_fn(s, a, step):
-	return nqueries[s][a] < max_num_queries
+    return nqueries[s][a] < max_num_queries
 """
 
 #################################################################
@@ -111,10 +111,10 @@ state_counts = [10,]*grid_width**2
 #################################################################
 
 """
-	# greedy policy:
-	action = np.argmax(policy[current_state])
-	# uniform random policy:
-	action = np.argmax(np.random.multinomial(1, [.2,.2,.2,.2,.2]))
+    # greedy policy:
+    action = np.argmax(policy[current_state])
+    # uniform random policy:
+    action = np.argmax(np.random.multinomial(1, [.2,.2,.2,.2,.2]))
 """
 
 
@@ -147,33 +147,37 @@ def update_q(state0, action, state1, reward, query):
     Q_values[state0][action] = (1-learning_rate)*old + learning_rate*new
 
 for step in range(nsteps):
-	state_counts[state] += 1
+    state_counts[state] += 1
 
-	# this is how the policy would work:
-	action = np.argmax(np.random.multinomial(1, policy[current_state]))
+    # this is how the policy would work:
+    action = np.argmax(np.random.multinomial(1, policy[current_state]))
 
-	# greedy Q-learning:
-	action = np.argmax(Q_values[current_state])
+    # greedy Q-learning:
+    action = np.argmax(Q_values[current_state])
 
-	if np.random.binomial(1, prob_random_action, 1)[0]: # take a random action
-		action = np.argmax(np.random.multinomial(1, [.2, .2, .2, .2, .2], 1))
+    # TODO: softmax Q-learning:
+    action = np.argmax(Q_values[current_state])
 
-	# +1 thing??
-	reward = np.random.binomial(1, reward_probabilities[current_state], 1)
-	total_reward += reward 
-	
-	query = query_fn(current_state, action, step)
-	if query:
+
+    if np.random.binomial(1, prob_random_action, 1)[0]: # take a random action
+        action = np.argmax(np.random.multinomial(1, [.2, .2, .2, .2, .2], 1))
+
+    # +1 thing??
+    reward = np.random.binomial(1, reward_probabilities[current_state], 1)
+    total_reward += reward 
+    
+    query = query_fn(current_state, action, step)
+    if query:
         nqueries[state][action] += 1
         total_r_observed[current_state][action] += reward
         total_observed_reward += reward 
 
     old_state = current_state
-	current_state = next_state(current_state, action)
-	if np.random.binomial(1, prob_random_reset, 1)[0]: # reset to initial state
-		current_state = 0
+    current_state = next_state(current_state, action)
+    if np.random.binomial(1, prob_random_reset, 1)[0]: # reset to initial state
+        current_state = 0
 
-	# TODO: more learning
+    # TODO: more learning
     #simple q-learner 
     update_q(old_state, action, current_state, reward)
 
