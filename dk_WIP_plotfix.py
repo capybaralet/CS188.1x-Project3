@@ -8,8 +8,8 @@ grid_width = 3
 prob_random_action = 0.1
 prob_random_reset = 0.001
 query_cost = .01
-gamma = .99 # discount factor
-prob_zero_reward = .9
+gamma = .9 # discount factor
+prob_zero_reward = .8
 
 learning_rate = .1
 
@@ -18,34 +18,27 @@ states = range(grid_width**2)
 
 # reward probabilities
 reward_probabilities = np.random.binomial(1, 1 - prob_zero_reward, len(states)) * np.random.uniform(0, 1, len(states))
-
+reward_probabilities = [0,0,0,0,0,0,0,0,1]
 
 
 ##################################
 def row_and_column(state):
-	return state / grid_width, state % grid_width
-
-"""
-def state_from_row_and_column(row, column):
-	state = row * grid_width + column
-	assert 0 <= state and state <= len(states) 
-	return state
-"""
+    return state / grid_width, state % grid_width
 
 actions = range(5) # stay, N, E, S, W
 
 def next_state(state, action):
-	row, column = row_and_column(state)
-	if action == 1 and row > 0:
-		return state - grid_width
-	if action == 2 and column < grid_width - 1:
-		return state + 1
-	if action == 3 and row < grid_width - 1:
-		return state + grid_width
-	if action == 4 and column > 0:
-		return state - 1
-	else:
-		return state
+    row, column = row_and_column(state)
+    if action == 1 and row > 0:
+        return state - grid_width
+    if action == 2 and column < grid_width - 1:
+        return state + 1
+    if action == 3 and row < grid_width - 1:
+        return state + grid_width
+    if action == 4 and column > 0:
+        return state - 1
+    else:
+        return state
 
 
 #################################################################
@@ -53,22 +46,22 @@ def next_state(state, action):
 
 # query each time
 def query_fn(s, a, step):
-	return True
+    return True
 
 # query first N times
 max_num_queries = 10000
 def query_fn(s, a, step):
-	return step < max_num_queries
+    return step < max_num_queries
 
 # query first N times in state s
 max_num_queries = 10000 / len(states)
 def query_fn(s, a, step):
-	return sum(nqueries[s]) < max_num_queries
+    return sum(nqueries[s]) < max_num_queries
 
 # query first N times if state s, taking action a
 max_num_queries = 10000 / len(states) / len(actions)
 def query_fn(s, a, step):
-	return nqueries[s][a] < max_num_queries
+    return nqueries[s][a] < max_num_queries
 
 
 
@@ -86,7 +79,7 @@ nqueries = [[0,0,0,0,0] for state in states]
 #policy = {state: [.2, .2, .2, .2, .2] for state in states}
 #nqueries = {state: [0,0,0,0,0] for state in states}
 
-nsteps = 100000
+nsteps = 10000
 current_state = 0
 total_reward = 0
 total_observed_reward = 0
@@ -97,16 +90,11 @@ total_observed_reward = 0
 def expected_reward(state, action): 
     return (total_r_observed[state][action] + .5 ) / ( nqueries[state][action] + 10)
 
-
-
-action_names = ['north', 'south', 'east', 'west']
+action_names = ['south', 'east', 'north', 'west']
 class QDummy(object): 
     def getQValue(self, state, action):
         s = state[0] + state[1]*grid_width
-
         a = action_names.index(action)+1
-
-
         return Q_values[s][a]
 
 dummy_agent = QDummy()
@@ -129,39 +117,38 @@ def update_q(state0, action, state1, reward, query):
     Q_values[state0][action] = (1-learning_rate)*old + learning_rate*new
 
 for step in range(nsteps):
-	# uniform random policy:
-	action = np.argmax(np.random.multinomial(1, [.2,.2,.2,.2,.2]))
-	# "thompson-sampling" greedy (proportional agent):
-	action = np.argmax(np.random.multinomial(1, policy[current_state]))
-	# greedy policy:
-	action = np.argmax(Q_values[current_state])
-	if np.random.binomial(1, prob_random_action, 1)[0]: # take a random action
-		action = np.argmax(np.random.multinomial(1, [.2, .2, .2, .2, .2], 1))
+    # uniform random policy:
+    action = np.argmax(np.random.multinomial(1, [.2,.2,.2,.2,.2]))
+    # "thompson-sampling" greedy (proportional agent):
+    action = np.argmax(np.random.multinomial(1, policy[current_state]))
+    # greedy policy:
+    action = np.argmax(Q_values[current_state])
+    if np.random.binomial(1, prob_random_action, 1)[0]: # take a random action
+        action = np.argmax(np.random.multinomial(1, [.2, .2, .2, .2, .2], 1))
 
-	query = query_fn(current_state, action, step)
-	# +1 thing??
-	reward = np.random.binomial(1, reward_probabilities[current_state], 1)
-	total_reward += reward 
+    query = query_fn(current_state, action, step)
+    # +1 thing??
+    reward = np.random.binomial(1, reward_probabilities[current_state], 1)
+    total_reward += reward 
 
-	if query:
-                nqueries[state][action] += 1
-                total_r_observed[current_state][action] += reward
-                total_observed_reward += reward 
+    if query:
+        nqueries[state][action] += 1
+        total_r_observed[current_state][action] += reward
+        total_observed_reward += reward 
 
-        old_state = current_state
-	current_state = next_state(current_state, action)
+    old_state = current_state
+    current_state = next_state(current_state, action)
 
-        if np.random.uniform(0,1) < prob_random_reset: #np.random.binomial(1, prob_random_reset, 1)[0]: # reset to initial state
-		current_state = 0
+    if np.random.uniform(0,1) < prob_random_reset: #np.random.binomial(1, prob_random_reset, 1)[0]: # reset to initial state
+        current_state = 0
 
-	# TODO: learning
+    #simple q-learner 
+    update_q(old_state, action, current_state, reward, query)
 
-        #simple q-learner 
-        update_q(old_state, action, current_state, reward, query)
-
-for i in range(8):
-    print reward_probabilities[i*7:(i+1)*7]
-display.displayQValues(dummy_agent, reverse(row_and_column(current_state)), "q vals")
+for i in range(grid_width):
+    print reward_probabilities[i*grid_width:(i+1)*grid_width]
+#display.displayQValues(dummy_agent, reverse(row_and_column(current_state)), "q vals")
+display.displayQValues(dummy_agent)
 print total_r_observed
 display.pause()
 
@@ -174,5 +161,6 @@ performance = total_reward - total_query_cost
 print "total_reward =", total_reward
 print "total_nqueries =", total_nqueries
 print "performance =", performance
+
 
 
