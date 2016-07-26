@@ -12,6 +12,9 @@ parser.add_argument('--query_cost', default=.01, type=float)
 parser.add_argument('--fixed_mdp', default=1, type=int)
 locals().update(parser.parse_args().__dict__)
 
+fixed_battery=1
+
+
 """
 The number of queries should be based on the total cost, NOT fixed. 
 
@@ -39,15 +42,6 @@ states = range(grid_width**2)
 # actions: stay, N, E, S, W
 actions = range(5)
 
-fixed_battery=1
-
-# reward probabilities (rewards are stochastic bernoulli)
-if fixed_mdp:
-    print "fixed_mdp"
-elif fixed_battery:
-    print "fixed_battery"
-else:
-    print "random each time"
 
 def row_and_column(state):
     return state / grid_width, state % grid_width
@@ -134,12 +128,13 @@ query_fns = OrderedDict()
 
 # simple baselines
 max_num_queries = 10000.
-query_fns['first N steps'] = lambda : step < max_num_queries
-query_fns['first N state visits'] = lambda : sum(nvisits[current_state]) < (max_num_queries / len(states))
-query_fns['first N (state,action) visits'] = lambda : nvisits[current_state][action] < (max_num_queries / (len(states) * len(actions)))
-query_probability_decay = 1 - 1. / max_num_queries 
-query_fns['decaying probability'] = lambda : np.random.binomial(1, query_probability_decay**step)
-query_fns['every time'] = lambda : True
+#query_fns['first N steps'] = lambda : step < max_num_queries
+query_fns['first N steps (based on query cost)'] = lambda : step < max_num_queries * (query_cost / .1)
+query_fns['first N state visits'] = lambda : sum(nvisits[current_state]) < (max_num_queries * (query_cost / .1) / len(states))
+query_fns['first N (state,action) visits'] = lambda : nvisits[current_state][action] < (max_num_queries * (query_cost / .1) / (len(states) * len(actions)))
+#query_probability_decay = 1 - 1. / max_num_queries 
+#query_fns['decaying probability'] = lambda : np.random.binomial(1, query_probability_decay**step)
+#query_fns['every time'] = lambda : True
 
 # query based on entropy of softmax policy:
 # FIXME: querying too much... also, we should be looking MORE at those with lower entropy, I think...
@@ -148,18 +143,18 @@ query_fns['every time'] = lambda : True
 
 # query based on entropy of P(r|s,a):
 query_fns['r entropy threshold'] = lambda : reward_entropy() > -1
-query_fns['stochastic r entropy'] = lambda : np.random.binomial(1, np.exp(reward_entropy()))
+#query_fns['stochastic r entropy'] = lambda : np.random.binomial(1, np.exp(reward_entropy()))
 
 # query based on number of state visits:
-query_fns['prob = proportion of state visits'] = lambda : np.random.binomial(1, (sum(nvisits[current_state]) + 50) / (sum(nvisits) + 50. * len(states)))
-query_fns['prob = proportion of state-action visits'] = lambda : np.random.binomial(1, (sum(nvisits[current_state][action]) + 10) / (sum(nvisits) + 10. * len(states) * len(actions)))
+#query_fns['prob = proportion of state visits'] = lambda : np.random.binomial(1, (sum(nvisits[current_state]) + 50) / (sum(nvisits) + 50. * len(states)))
+#query_fns['prob = proportion of state-action visits'] = lambda : np.random.binomial(1, (sum(nvisits[current_state][action]) + 10) / (sum(nvisits) + 10. * len(states) * len(actions)))
 
 # query based on expected reward
-query_fns['geq than average expected reward'] = lambda : expected_reward(current_state, action) >= mean([expected_reward(s,a) for s in states for a in actions])
+#query_fns['geq than average expected reward'] = lambda : expected_reward(current_state, action) >= mean([expected_reward(s,a) for s in states for a in actions])
 query_fns['proportion of expected reward'] = lambda : np.random.binomial(1, expected_reward(current_state, action) / sum(expected_reward(s,a) for s in states for a in actions))
 
 # query based on expected reward
-query_fns['geq than average Q'] = lambda : Q_values[current_state][action] >= mean(Q_values)
+#query_fns['geq than average Q'] = lambda : Q_values[current_state][action] >= mean(Q_values)
 query_fns['proportion of Q'] = lambda : np.random.binomial(1, (Q_values[current_state][action] + 1) / (sum(Q_values) + 1))
 
 # query based on entropy of P(s):
@@ -253,10 +248,17 @@ for name,query_fn in query_fns.items():
         print "performance =", performance
         performances.append(performance)
         print time.time() - t1
+
         save_str = '/u/kruegerd/CS188.1x-Project3/results/'
+        save_str += 'total_nqueries_' + name + '__query_cost=' + str(query_cost)
         if fixed_mdp:
-            save_str += 'fixed_mdp__'
+            save_str += '__fixed_mdp'
+        np.save(save_str, total_nqueries)
+
+        save_str = '/u/kruegerd/CS188.1x-Project3/results/'
         save_str += 'performances_' + name + '__query_cost=' + str(query_cost)
+        if fixed_mdp:
+            save_str += '__fixed_mdp'
         np.save(save_str, performances)
 
     #hist(performances, 50)

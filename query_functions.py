@@ -8,8 +8,12 @@ Experiment flow:
 
 MATH TODO:
     1. figure out bayesian policy
+        same thing as thompson sampling of Q function, I think...
+        how to actually compute the policy, instead of just sampling from it??
     2. figure out information gain
-    3. thompson sampling of Q function?
+
+OTHER TODO:
+    use TD-lambda!
 
 IDEAS for query functions:
     query based on uncertainty of P(s)
