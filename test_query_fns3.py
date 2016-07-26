@@ -129,9 +129,9 @@ query_fns = OrderedDict()
 # simple baselines
 max_num_queries = 10000.
 #query_fns['first N steps'] = lambda : step < max_num_queries
-query_fns['first N steps (based on query cost)'] = lambda : step < max_num_queries * (.1 / query_cost)
-query_fns['first N state visits'] = lambda : sum(nvisits[current_state]) < (max_num_queries * (.1 / query_cost) / len(states))
-query_fns['first N (state,action) visits'] = lambda : nvisits[current_state][action] < (max_num_queries * (.1 / query_cost) / (len(states) * len(actions)))
+query_fns['first N steps (based on query cost)'] = lambda : step < max_num_queries * (query_cost / .1)
+query_fns['first N state visits'] = lambda : sum(nvisits[current_state]) < (max_num_queries * (query_cost / .1) / len(states))
+query_fns['first N (state,action) visits'] = lambda : nvisits[current_state][action] < (max_num_queries * (query_cost / .1) / (len(states) * len(actions)))
 #query_probability_decay = 1 - 1. / max_num_queries 
 #query_fns['decaying probability'] = lambda : np.random.binomial(1, query_probability_decay**step)
 #query_fns['every time'] = lambda : True

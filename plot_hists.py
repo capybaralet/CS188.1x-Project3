@@ -56,7 +56,8 @@ query_fns['proportion of Q'] = lambda : np.random.binomial(1, (Q_values[current_
 for name in query_fns:
     print name 
 all_mean_performances = []
-for query_cost in [1.,.3,.1,.03,.01,.003,.001]:
+#for query_cost in [1.,.3,.1,.03,.01,.003,.001]:
+for query_cost in [2.,3.,4.,5.,10.,20.,50.,100.]:
     #for fixed_mdp in [0,1]: 
     for fixed_mdp in [ 1]: 
         figure()
@@ -68,7 +69,8 @@ for query_cost in [1.,.3,.1,.03,.01,.003,.001]:
         mean_performances = []
         for name,query_fn in query_fns.items():
             n += 1
-            if (3 < n < 6) or n == 7 or n == 9 or n == 11 or n == 13:
+            #if (3 < n < 6) or n == 7 or n == 9 or n == 11 or n == 13:
+            if (3 < n < 6) or n == 7 or n == 11 or n == 13:
                 save_dir = '/Users/david/CS188.1x-Project3/results/'
                 save_str = ''
                 if fixed_mdp:
