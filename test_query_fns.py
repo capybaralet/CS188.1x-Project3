@@ -1,27 +1,46 @@
 from pylab import *
+import scipy
+import scipy.stats
 import numpy
 np = numpy
 from collections import OrderedDict
 import time
+
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument('--query_cost', default=.01, type=float)
+parser.add_argument('--fixed_mdp', default=True, type=bool)
+locals().update(parser.parse_args().__dict__)
+
+# NTS: a lot of bugs caused by using "state" instead of "current_state"... maybe should renameNTS: a lot of bugs caused by using "state" instead of "current_state"... maybe should rename
 
 # hyper-parameters:
 grid_width = 8
 epsilon = 0.1
 prob_random_move = 0.1
 prob_random_reset = 0.001
-query_cost = .1 # overridden in for loop!
 gamma = .9 # discount factor
 prob_zero_reward = .9
 learning_rate = .1
 
-num_experiments = 300
+num_experiments = 200
+#num_experiments = 1
+num_steps = 100000
 
 # states (lexical order)
 states = range(grid_width**2)
 # actions: stay, N, E, S, W
 actions = range(5)
+
+fixed_battery=1
+
 # reward probabilities (rewards are stochastic bernoulli)
-reward_probabilities = np.random.binomial(1, 1 - prob_zero_reward, len(states)) * np.random.uniform(0, 1, len(states))
+if fixed_mdp:
+    reward_probabilities = np.load('fixed_mdp0.npy')
+elif fixed_battery:
+    reward_probabilitiez = np.random.binomial(1, 1 - prob_zero_reward, len(states)) * np.random.uniform(0, 1, len(states))
+else:
+    reward_probabilities = np.random.binomial(1, 1 - prob_zero_reward, len(states)) * np.random.uniform(0, 1, len(states))
 
 
 def row_and_column(state):
@@ -64,71 +83,85 @@ def softmax(x):
 
 # learn a distribution over states (dirichlet-multinomial) 
 def state_entropy():
-    # requires scipy version>0.15
-    return scipy.stats.dirichlet([nvisit + .5 for nvisit in nvisits]).entropy()
+    return scipy.stats.dirichlet([sum(nvisit) + .5 for nvisit in nvisits]).entropy()
 def state_probability(state):
     (sum(nvisits[state]) + .5) / (step + .5*len(states))
 
+
 # learn a distribution over rewards (beta-bernoulli)
+# we use a lookup table to speed up computations
+# the list version was too large.  I'm trying a dictionary instead...
+#beta_entropy_lookup = np.inf * np.ones((num_steps, num_steps))
+beta_entropy_lookup = {}
+
 def reward_entropy():
-    alpha = total_r_observed[state][action] + .5
-    beta = ( nqueries[state][action] + 1) - alpha
-    return scipy.stats.beta(alpha, beta).entropy()
+    # empirical counts
+    alpha_ = total_r_observed[current_state][action]
+    beta_ = nqueries[current_state][action] - alpha_
+    if (alpha_, beta_) in beta_entropy_lookup:
+        entry = beta_entropy_lookup[(alpha_, beta_)]
+    else:
+        entry = scipy.stats.beta(alpha_ + .5, beta_ + 1).entropy()
+        beta_entropy_lookup[(alpha_, beta_)] = entry
+    return entry
+
 def expected_reward(state, action): 
     alpha = total_r_observed[state][action] + .5
     beta = ( nqueries[state][action] + 1) - alpha
     return alpha / (alpha + beta)#(total_r_observed[state][action] + .5 ) / ( nqueries[state][action] + 1)
 
+
+# TODO:
 # learn a distribution over Q_values (Gaussian, even though it's probably the wrong thing...)
 # initialize means based on prior over rewards (E[r] = .5) and discount rate
 # initialize std = mean
 mean_Q_values = [[.5 * (1 / 1 - gamma),] * len(actions),] *len(states)
 std_Q_values = [[.5 * (1 / 1 - gamma),] * len(actions),] *len(states)
 
-# TODO: replace w/Gaussian
-def state_entropy():
-    return scipy.stats.dirichlet([nvisit + .5 for nvisit in nvisits]).entropy()
-def state_probability(state):
-    (sum(nvisits[state]) + .5) / (step + .5*len(states))
-
 #
 def softmax_entropy():
-    return multinomial_entropy(softmax(Q_values[state]))
+    return multinomial_entropy(softmax(Q_values[current_state]))
 
 #################################################################
 # Query functions
 query_fns = OrderedDict()
 
 # simple baselines
-max_num_queries = 10000
+max_num_queries = 10000.
 query_fns['first N steps'] = lambda : step < max_num_queries
-query_fns['first N state visits'] = lambda : nvisits[current_state] < (max_num_queries / len(states))
-query_fns['first N (state,action) visits'] = lambda : nvisits[current_state][action] < (max_num_queries / len(states) / len(actions))
+query_fns['first N state visits'] = lambda : sum(nvisits[current_state]) < (max_num_queries / len(states))
+query_fns['first N (state,action) visits'] = lambda : nvisits[current_state][action] < (max_num_queries / (len(states) * len(actions)))
 query_probability_decay = 1 - 1. / max_num_queries 
 query_fns['decaying probability'] = lambda : np.random.binomial(1, query_probability_decay**step)
 query_fns['every time'] = lambda : True
 
+# query based on entropy of softmax policy:
+# FIXME: querying too much... also, we should be looking MORE at those with lower entropy, I think...
+#query_fns['softmax entropy threshold'] = lambda : softmax_entropy() > 1
+#query_fns['stochastic softmax entropy'] = lambda : np.random.binomial(1, softmax_entropy() / multinomial_entropy([.2,.2,.2,.2,.2]))
 
 # query based on entropy of P(r|s,a):
 query_fns['r entropy threshold'] = lambda : reward_entropy() > -1
-query_fns['stochastic r entropy'] = lambda : np.binomial(1, np.exp(reward_entropy()))
+query_fns['stochastic r entropy'] = lambda : np.random.binomial(1, np.exp(reward_entropy()))
+
+# query based on number of state visits:
+query_fns['prob = proportion of state visits'] = lambda : np.random.binomial(1, (sum(nvisits[current_state]) + 50) / (sum(nvisits) + 50. * len(states)))
+query_fns['prob = proportion of state-action visits'] = lambda : np.random.binomial(1, (sum(nvisits[current_state][action]) + 10) / (sum(nvisits) + 10. * len(states) * len(actions)))
+
+# query based on expected reward
+query_fns['geq than average expected reward'] = lambda : expected_reward(current_state, action) >= mean([expected_reward(s,a) for s in states for a in actions])
+query_fns['proportion of expected reward'] = lambda : np.random.binomial(1, expected_reward(current_state, action) / sum(expected_reward(s,a) for s in states for a in actions))
+
+# query based on expected reward
+query_fns['geq than average Q'] = lambda : Q_values[current_state][action] >= mean(Q_values)
+query_fns['proportion of Q'] = lambda : np.random.binomial(1, (Q_values[current_state][action] + 1) / (sum(Q_values) + 1))
 
 # query based on entropy of P(s):
-query_fns['s entropy threshold'] = lambda : state_entropy() > -1
-query_fns['stochastic s entropy'] = lambda : np.binomial(1, np.exp(state_entropy()))
-
-# query based on entropy of softmax policy:
-query_fns['softmax entropy threshold'] = lambda : softmax_entropy() > 1
-query_fns['stochastic softmax entropy'] = lambda : np.binomial(1, softmax_entropy() / multinomial_entropy([0,0,0,0,0]))
-
-# TODO:
-# query based on entropy of "bayesian" policy:
-# (this policy takes actions according to their true probability of being optimal, given that we have distributions over Q_values)
-#query_fns['softmax entropy threshold'] = lambda : softmax_entropy() > 1
-#query_fns['stochastic softmax entropy'] = lambda : np.binomial(1, softmax_entropy() / multinomial_entropy([0,0,0,0,0]))
+# TODO: we want this to actually depend on the state we're in, otherwise, it seems to mostly just scale with sqrt(nvisits)
+#query_fns['s entropy threshold'] = lambda : state_entropy() > -240
+#query_fns['stochastic s entropy'] = lambda : np.random.binomial(1, np.exp(state_entropy())) # TODO: scaling...
 
 
-query_fn = query_fns['every time']
 
 #################################################################
 # LEARNING
@@ -140,21 +173,32 @@ def update_q(state0, action, state1, reward, query):
     new = reward + gamma*np.max(Q_values[state1])
     Q_values[state0][action] = (1-learning_rate)*old + learning_rate*new
 
-nsteps = 50000
 
 
-for n in range(grid_width):
-    print reward_probabilities[n*grid_width: (n+1)*grid_width]
+
+query_fn = query_fns['every time']
 
 t1 = time.time()
-
 all_results = {}
-for query_cost in [.01]:#, .03, .01]:
+
+for name,query_fn in query_fns.items():
     print "\n query_cost=", query_cost, '\n'
+    print "name=", name
     all_results[query_cost] = {}
 
     performances = []
     for nex in range(num_experiments):
+        # reward probabilities (rewards are stochastic bernoulli)
+        if fixed_mdp:
+            reward_probabilities = np.load('fixed_mdp0.npy')
+        elif fixed_battery:
+            reward_probabilities = np.load('200mdps.npy')[nex*len(states): (nex+1)*len(states)]
+        else:
+            reward_probabilities = np.random.binomial(1, 1 - prob_zero_reward, len(states)) * np.random.uniform(0, 1, len(states))
+        for n in range(grid_width):
+            print reward_probabilities[n*grid_width: (n+1)*grid_width]
+
+
         # reset for a new experiment
         Q_values = [[0,0,0,0,0] for state in states]
         total_r_observed = [[0,0,0,0,0] for state in states] 
@@ -163,16 +207,17 @@ for query_cost in [.01]:#, .03, .01]:
         current_state = 0
         total_reward = 0
 
-        for step in range(nsteps):
+        for step in range(num_steps):
             #state_counts[state] += 1
             action = np.argmax(Q_values[current_state])
             if np.random.binomial(1, epsilon): # take a random action
                 action = np.argmax(np.random.multinomial(1, [.2, .2, .2, .2, .2]))
+            nvisits[current_state][action] += 1
             reward = np.random.binomial(1, reward_probabilities[current_state])
             total_reward += reward 
-            query = query_fn()#current_state, action, step)
+            query = query_fn()
             if query:
-                nqueries[state][action] += 1
+                nqueries[current_state][action] += 1
                 # TODO: naming these two
                 total_r_observed[current_state][action] += reward
 
@@ -198,9 +243,11 @@ for query_cost in [.01]:#, .03, .01]:
             print "total_nqueries =", total_nqueries
             print "performance =", performance
             print ''
+        print "total_nqueries =", total_nqueries
         print "performance =", performance
         performances.append(performance)
+        print time.time() - t1
+        np.save('performances_' + name + '__query_cost=' + str(query_cost),performances)
 
-    hist(performances, 50)
+    #hist(performances, 50)
 
-print time.time() - t1
