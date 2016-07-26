@@ -35,8 +35,8 @@ gamma = .9 # discount factor
 prob_zero_reward = .9
 learning_rate = .1
 
-num_experiments = 60
-num_experiments = 1
+num_experiments = 30
+#num_experiments = 1
 num_steps = 100000
 
 # states (lexical order)
