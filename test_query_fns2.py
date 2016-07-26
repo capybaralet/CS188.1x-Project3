@@ -101,7 +101,7 @@ def reward_entropy():
     if (alpha_, beta_) in beta_entropy_lookup:
         entry = beta_entropy_lookup[(alpha_, beta_)]
     else:
-        entry = scipy.stats.beta(alpha_ + .5, beta_ + 1).entropy()
+        entry = scipy.stats.beta(alpha_ + .5, beta_ + .5).entropy()
         beta_entropy_lookup[(alpha_, beta_)] = entry
     return entry
 

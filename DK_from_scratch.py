@@ -4,11 +4,11 @@ import gridworld
 
 
 # hyper-parameters:
-grid_width = 3
+grid_width = 8
 prob_random_action = 0.1
 prob_random_reset = 0.001
 query_cost = .01
-gamma = .75 # discount factor
+gamma = .9 # discount factor
 prob_zero_reward = .9
 
 learning_rate = .1
@@ -18,7 +18,7 @@ states = range(grid_width**2)
 
 # reward probabilities
 reward_probabilities = np.random.binomial(1, 1 - prob_zero_reward, len(states)) * np.random.uniform(0, 1, len(states))
-reward_probabilities = [0,0,0,0,0,0,0,0,1]
+#reward_probabilities = [0,0,0,0,0,0,0,0,1]
 
 
 
