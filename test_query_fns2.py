@@ -177,7 +177,7 @@ def update_q(state0, action, state1, reward, query):
 
 
 
-query_fn = query_fns['every time']
+#query_fn = query_fns['every time']
 
 t1 = time.time()
 all_results = {}
