@@ -111,6 +111,17 @@ def reward_entropy():
         beta_entropy_lookup[(alpha_, beta_)] = entry
     return entry
 
+def ireward_entropy(current_state, action):
+    # empirical counts
+    alpha_ = total_r_observed[current_state][action]
+    beta_ = nqueries[current_state][action] - alpha_
+    if (alpha_, beta_) in beta_entropy_lookup:
+        entry = beta_entropy_lookup[(alpha_, beta_)]
+    else:
+        entry = scipy.stats.beta(alpha_ + .5, beta_ + 1).entropy()
+        beta_entropy_lookup[(alpha_, beta_)] = entry
+    return entry
+
 def expected_reward(state, action): 
     alpha = total_r_observed[state][action] + .5
     beta = ( nqueries[state][action] + 1) - alpha

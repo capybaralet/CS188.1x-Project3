@@ -10,6 +10,8 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--query_cost', default=.01, type=float)
 parser.add_argument('--fixed_mdp', default=1, type=int)
+parser.add_argument('--budget', default='med', type=str)
+parser.add_argument('--our_hack', default=0, type=int)
 locals().update(parser.parse_args().__dict__)
 
 fixed_battery=1
@@ -33,7 +35,7 @@ gamma = .9 # discount factor
 prob_zero_reward = .9
 learning_rate = .1
 
-num_experiments = 200
+num_experiments = 30
 #num_experiments = 1
 num_steps = 100000
 
@@ -105,6 +107,17 @@ def reward_entropy():
         beta_entropy_lookup[(alpha_, beta_)] = entry
     return entry
 
+def ireward_entropy(current_state, action):
+    # empirical counts
+    alpha_ = total_r_observed[current_state][action]
+    beta_ = nqueries[current_state][action] - alpha_
+    if (alpha_, beta_) in beta_entropy_lookup:
+        entry = beta_entropy_lookup[(alpha_, beta_)]
+    else:
+        entry = scipy.stats.beta(alpha_ + .5, beta_ + .5).entropy()
+        beta_entropy_lookup[(alpha_, beta_)] = entry
+    return entry
+
 def expected_reward(state, action): 
     alpha = total_r_observed[state][action] + .5
     beta = ( nqueries[state][action] + 1) - alpha
@@ -127,11 +140,24 @@ def softmax_entropy():
 query_fns = OrderedDict()
 
 # simple baselines
-max_num_queries = 10000.
+if budget == 'high':
+    max_num_queries = 100000. / query_cost
+    #temperature = 1 #TODO
+    thresh = -3
+elif budget == 'med':
+    max_num_queries = 30000. / query_cost
+    thresh = -2
+elif budget == 'low':
+    max_num_queries = 10000. / query_cost
+    thresh = -1
+elif budget == 'very_low':
+    max_num_queries = 1000. / query_cost
+    thresh = -.5
 #query_fns['first N steps'] = lambda : step < max_num_queries
-query_fns['first N steps (based on query cost)'] = lambda : step < max_num_queries * (.1 / query_cost)
-query_fns['first N state visits'] = lambda : sum(nvisits[current_state]) < (max_num_queries * (.1 / query_cost) / len(states))
-query_fns['first N (state,action) visits'] = lambda : nvisits[current_state][action] < (max_num_queries * (.1 / query_cost) / (len(states) * len(actions)))
+#query_fns['first N steps (based on query cost)'] = lambda : step < max_num_queries * (.1 / query_cost)
+#query_fns['first N state visits'] = lambda : sum(nvisits[current_state]) < (max_num_queries * (.1 / query_cost) / len(states))
+if not our_hack:
+    query_fns['first N (state,action) visits'] = lambda : nvisits[current_state][action] < (max_num_queries * (.1 / query_cost) / (len(states) * len(actions)))
 #query_probability_decay = 1 - 1. / max_num_queries 
 #query_fns['decaying probability'] = lambda : np.random.binomial(1, query_probability_decay**step)
 #query_fns['every time'] = lambda : True
@@ -142,7 +168,7 @@ query_fns['first N (state,action) visits'] = lambda : nvisits[current_state][act
 #query_fns['stochastic softmax entropy'] = lambda : np.random.binomial(1, softmax_entropy() / multinomial_entropy([.2,.2,.2,.2,.2]))
 
 # query based on entropy of P(r|s,a):
-query_fns['r entropy threshold'] = lambda : reward_entropy() > -1
+#query_fns['r entropy threshold'] = lambda : reward_entropy() > thresh
 #query_fns['stochastic r entropy'] = lambda : np.random.binomial(1, np.exp(reward_entropy()))
 
 # query based on number of state visits:
@@ -151,11 +177,13 @@ query_fns['r entropy threshold'] = lambda : reward_entropy() > -1
 
 # query based on expected reward
 #query_fns['geq than average expected reward'] = lambda : expected_reward(current_state, action) >= mean([expected_reward(s,a) for s in states for a in actions])
-query_fns['proportion of expected reward'] = lambda : np.random.binomial(1, expected_reward(current_state, action) / sum(expected_reward(s,a) for s in states for a in actions))
+# this explores more where there's more to explore!
+if our_hack:
+    query_fns['proportion of expected reward'] = lambda : np.random.binomial(1, expected_reward(current_state, action) / sum(expected_reward(s,a) for s in states for a in actions))
 
 # query based on expected reward
 #query_fns['geq than average Q'] = lambda : Q_values[current_state][action] >= mean(Q_values)
-query_fns['proportion of Q'] = lambda : np.random.binomial(1, (Q_values[current_state][action] + 1) / (sum(Q_values) + 1))
+#query_fns['proportion of Q'] = lambda : np.random.binomial(1, (Q_values[current_state][action] + 1) / (sum(Q_values) + 1))
 
 # query based on entropy of P(s):
 # TODO: we want this to actually depend on the state we're in, otherwise, it seems to mostly just scale with sqrt(nvisits)
@@ -208,6 +236,9 @@ for name,query_fn in query_fns.items():
         current_state = 0
         total_reward = 0
 
+        #import itertools
+        #print [ireward_entropy(s,a) for (s,a) in itertools.product(states, actions)]
+
         for step in range(num_steps):
             #state_counts[state] += 1
             action = np.argmax(Q_values[current_state])
@@ -250,13 +281,13 @@ for name,query_fn in query_fns.items():
         print time.time() - t1
 
         save_str = '/u/kruegerd/CS188.1x-Project3/results/'
-        save_str += 'total_nqueries_' + name + '__query_cost=' + str(query_cost)
+        save_str += 'total_nqueries_' + name + '__query_cost=' + str(query_cost) + '__budget=' + str(budget)
         if fixed_mdp:
             save_str += '__fixed_mdp'
         np.save(save_str, total_nqueries)
 
         save_str = '/u/kruegerd/CS188.1x-Project3/results/'
-        save_str += 'performances_' + name + '__query_cost=' + str(query_cost)
+        save_str += 'performances_' + name + '__query_cost=' + str(query_cost) + '__budget=' + str(budget)
         if fixed_mdp:
             save_str += '__fixed_mdp'
         np.save(save_str, performances)
