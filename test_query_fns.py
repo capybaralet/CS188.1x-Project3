@@ -9,7 +9,7 @@ import time
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--query_cost', default=.01, type=float)
-parser.add_argument('--fixed_mdp', default=True, type=bool)
+parser.add_argument('--fixed_mdp', default=1, type=int)
 locals().update(parser.parse_args().__dict__)
 
 # NTS: a lot of bugs caused by using "state" instead of "current_state"... maybe should renameNTS: a lot of bugs caused by using "state" instead of "current_state"... maybe should rename
@@ -36,12 +36,11 @@ fixed_battery=1
 
 # reward probabilities (rewards are stochastic bernoulli)
 if fixed_mdp:
-    reward_probabilities = np.load('fixed_mdp0.npy')
+    print "fixed_mdp"
 elif fixed_battery:
-    reward_probabilitiez = np.random.binomial(1, 1 - prob_zero_reward, len(states)) * np.random.uniform(0, 1, len(states))
+    print "fixed_battery"
 else:
-    reward_probabilities = np.random.binomial(1, 1 - prob_zero_reward, len(states)) * np.random.uniform(0, 1, len(states))
-
+    print "random each time"
 
 def row_and_column(state):
     return state / grid_width, state % grid_width
@@ -190,9 +189,9 @@ for name,query_fn in query_fns.items():
     for nex in range(num_experiments):
         # reward probabilities (rewards are stochastic bernoulli)
         if fixed_mdp:
-            reward_probabilities = np.load('fixed_mdp0.npy')
+            reward_probabilities = np.load('/u/kruegerd/CS188.1x-Project3/fixed_mdp0.npy')
         elif fixed_battery:
-            reward_probabilities = np.load('200mdps.npy')[nex*len(states): (nex+1)*len(states)]
+            reward_probabilities = np.load('/u/kruegerd/CS188.1x-Project3/200mdps.npy')[nex*len(states): (nex+1)*len(states)]
         else:
             reward_probabilities = np.random.binomial(1, 1 - prob_zero_reward, len(states)) * np.random.uniform(0, 1, len(states))
         for n in range(grid_width):
@@ -247,7 +246,11 @@ for name,query_fn in query_fns.items():
         print "performance =", performance
         performances.append(performance)
         print time.time() - t1
-        np.save('performances_' + name + '__query_cost=' + str(query_cost),performances)
+        save_str = '/u/kruegerd/CS188.1x-Project3/results/'
+        if fixed_mdp:
+            save_str += 'fixed_mdp__'
+        save_str += 'performances_' + name + '__query_cost=' + str(query_cost)
+        np.save(save_str, performances)
 
     #hist(performances, 50)
 

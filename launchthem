@@ -1,14 +1,14 @@
-ssh leto01 'python /u/kruegerd/CS188.1x-Project3/test_query_fns.py --query_cost=1.'
-ssh leto02 'python /u/kruegerd/CS188.1x-Project3/test_query_fns.py --query_cost=.3'
-ssh leto03 'python /u/kruegerd/CS188.1x-Project3/test_query_fns.py --query_cost=.1'
-ssh leto04 'python /u/kruegerd/CS188.1x-Project3/test_query_fns.py --query_cost=.03'
-ssh leto05 'python /u/kruegerd/CS188.1x-Project3/test_query_fns.py --query_cost=.01'
-ssh leto06 'python /u/kruegerd/CS188.1x-Project3/test_query_fns.py --query_cost=.003'
-ssh leto07 'python /u/kruegerd/CS188.1x-Project3/test_query_fns.py --query_cost=.001'
-ssh leto08 'python /u/kruegerd/CS188.1x-Project3/test_query_fns.py --query_cost=1. --fixed_mdp=False'
-ssh leto09 'python /u/kruegerd/CS188.1x-Project3/test_query_fns.py --query_cost=.3 --fixed_mdp=False'
-ssh leto10 'python /u/kruegerd/CS188.1x-Project3/test_query_fns.py --query_cost=.1 --fixed_mdp=False'
-ssh leto11 'python /u/kruegerd/CS188.1x-Project3/test_query_fns.py --query_cost=.03 --fixed_mdp=False'
-ssh leto12 'python /u/kruegerd/CS188.1x-Project3/test_query_fns.py --query_cost=.01 --fixed_mdp=False'
-ssh leto13 'python /u/kruegerd/CS188.1x-Project3/test_query_fns.py --query_cost=.003 --fixed_mdp=False'
-ssh leto14 'python /u/kruegerd/CS188.1x-Project3/test_query_fns.py --query_cost=.001 --fixed_mdp=False'
+ssh leto01 python /u/kruegerd/CS188.1x-Project3/test_query_fns.py --query_cost=1. &
+ssh leto02 python /u/kruegerd/CS188.1x-Project3/test_query_fns.py --query_cost=.3 &
+ssh leto03 python /u/kruegerd/CS188.1x-Project3/test_query_fns.py --query_cost=.1 &
+ssh leto04 python /u/kruegerd/CS188.1x-Project3/test_query_fns.py --query_cost=.03 &
+ssh leto05 python /u/kruegerd/CS188.1x-Project3/test_query_fns.py --query_cost=.01 &
+ssh leto06 python /u/kruegerd/CS188.1x-Project3/test_query_fns.py --query_cost=.003 &
+ssh leto07 python /u/kruegerd/CS188.1x-Project3/test_query_fns.py --query_cost=.001 &
+ssh leto15 python /u/kruegerd/CS188.1x-Project3/test_query_fns.py --query_cost=1. --fixed_mdp=0 &
+ssh leto16 python /u/kruegerd/CS188.1x-Project3/test_query_fns.py --query_cost=.3 --fixed_mdp=0 &
+ssh leto17 python /u/kruegerd/CS188.1x-Project3/test_query_fns.py --query_cost=.1 --fixed_mdp=0 &
+ssh leto11 python /u/kruegerd/CS188.1x-Project3/test_query_fns.py --query_cost=.03 --fixed_mdp=0 &
+ssh leto12 python /u/kruegerd/CS188.1x-Project3/test_query_fns.py --query_cost=.01 --fixed_mdp=0 &
+ssh leto13 python /u/kruegerd/CS188.1x-Project3/test_query_fns.py --query_cost=.003 --fixed_mdp=0 &
+ssh leto14 python /u/kruegerd/CS188.1x-Project3/test_query_fns.py --query_cost=.001 --fixed_mdp=0 &
