@@ -46,7 +46,7 @@ for query_cost in query_costs:
     suptitle(title)
     #subplot(122)
     bar(range(len(mean_performances)), mean_performances)
-    ylim(50000,70000)
+    #ylim(20000,70000)
     #subplot(121)
     #hist(performances, 25)
 
