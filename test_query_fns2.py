@@ -196,7 +196,7 @@ if our_hack:
 # LEARNING
 
 def update_q(state0, action, state1, reward, query): 
-    if query: 
+    if not query: 
         reward = expected_reward(state0, action)
     old = Q_values[state0][action] 
     new = reward + gamma*np.max(Q_values[state1])
