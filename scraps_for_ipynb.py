@@ -6,61 +6,23 @@ np = numpy
 from collections import OrderedDict
 import time
 
-import argparse
-parser = argparse.ArgumentParser()
-parser.add_argument('--query_cost', default=.01, type=float)
-parser.add_argument('--fixed_mdp', default=1, type=int)
-parser.add_argument('--budget', default='med', type=str)
-parser.add_argument('--our_hack', default=0, type=int)
-locals().update(parser.parse_args().__dict__)
-
-fixed_battery=1
-
-
-"""
-The number of queries should be based on the total cost, NOT fixed. 
-
-We should save more information (what??)
-
-"""
-
-# NTS: a lot of bugs caused by using "state" instead of "current_state"... maybe should renameNTS: a lot of bugs caused by using "state" instead of "current_state"... maybe should rename
-
-# hyper-parameters:
-grid_width = 8
-epsilon = 0.1
-prob_random_move = 0.1
-prob_random_reset = 0.001
-gamma = .9 # discount factor
-prob_zero_reward = .9
-learning_rate = .1
-
-num_experiments = 100
-#num_experiments = 1
-num_steps = 100000
-
-# states (lexical order)
-states = range(grid_width**2)
-# actions: stay, N, E, S, W
-actions = range(5)
-
-
-def row_and_column(state):
-    return state / grid_width, state % grid_width
-
-# basic environment dynamics
-def next_state(state, action):
-    row, column = row_and_column(state)
-    if action == 1 and row > 0:
-        return state - grid_width
-    if action == 2 and column < grid_width - 1:
-        return state + 1
-    if action == 3 and row < grid_width - 1:
-        return state + grid_width
-    if action == 4 and column > 0:
-        return state - 1
+# basic environment dynamics.
+# running into walls leaves you where you are.
+def get_next_state(state, current_action):
+    row, column = state / grid_width, state % grid_width
+    if np.random.binomial(1, prob_random_move): # current_action is replaced at random
+        current_action = np.argmax(np.random.multinomial(1, [.2,.2,.2,.2,.2]))
+    if current_action == 1 and row > 0:
+        next_state = state - grid_width
+    elif current_action == 2 and column < grid_width - 1:
+        next_state = state + 1
+    elif current_action == 3 and row < grid_width - 1:
+        next_state = state + grid_width
+    elif current_action == 4 and column > 0:
+        next_state = state - 1
     else:
-        return state
+        next_state = state
+    return next_state
 
 #################################################################
 # generally useful functions
@@ -98,8 +60,8 @@ beta_entropy_lookup = {}
 
 def reward_entropy():
     # empirical counts
-    alpha_ = total_r_observed[current_state][action]
-    beta_ = nqueries[current_state][action] - alpha_
+    alpha_ = total_r_observed[current_state][current_action]
+    beta_ = nqueries[current_state][current_action] - alpha_
     if (alpha_, beta_) in beta_entropy_lookup:
         entry = beta_entropy_lookup[(alpha_, beta_)]
     else:
@@ -107,10 +69,10 @@ def reward_entropy():
         beta_entropy_lookup[(alpha_, beta_)] = entry
     return entry
 
-def ireward_entropy(current_state, action):
+def ireward_entropy(current_state, current_action):
     # empirical counts
-    alpha_ = total_r_observed[current_state][action]
-    beta_ = nqueries[current_state][action] - alpha_
+    alpha_ = total_r_observed[current_state][current_action]
+    beta_ = nqueries[current_state][current_action] - alpha_
     if (alpha_, beta_) in beta_entropy_lookup:
         entry = beta_entropy_lookup[(alpha_, beta_)]
     else:
@@ -118,18 +80,18 @@ def ireward_entropy(current_state, action):
         beta_entropy_lookup[(alpha_, beta_)] = entry
     return entry
 
-def expected_reward(state, action): 
-    alpha = total_r_observed[state][action] + .5
-    beta = ( nqueries[state][action] + 1) - alpha
-    return alpha / (alpha + beta)#(total_r_observed[state][action] + .5 ) / ( nqueries[state][action] + 1)
+def expected_reward(state, current_action): 
+    alpha = total_r_observed[state][current_action] + .5
+    beta = ( nqueries[state][current_action] + 1) - alpha
+    return alpha / (alpha + beta)#(total_r_observed[state][current_action] + .5 ) / ( nqueries[state][current_action] + 1)
 
 
 # TODO:
 # learn a distribution over Q_values (Gaussian, even though it's probably the wrong thing...)
 # initialize means based on prior over rewards (E[r] = .5) and discount rate
 # initialize std = mean
-mean_Q_values = [[.5 * (1 / 1 - gamma),] * len(actions),] *len(states)
-std_Q_values = [[.5 * (1 / 1 - gamma),] * len(actions),] *len(states)
+mean_Q_values = [[.5 * (1 / 1 - gamma),] * len(current_actions),] *len(states)
+std_Q_values = [[.5 * (1 / 1 - gamma),] * len(current_actions),] *len(states)
 
 #
 def softmax_entropy():
@@ -157,7 +119,7 @@ elif budget == 'very_low':
 #query_fns['first N steps (based on query cost)'] = lambda : step < max_num_queries * (.1 / query_cost)
 #query_fns['first N state visits'] = lambda : sum(nvisits[current_state]) < (max_num_queries * (.1 / query_cost) / len(states))
 if not our_hack:
-    query_fns['first N (state,action) visits'] = lambda : nvisits[current_state][action] < (max_num_queries / (len(states) * len(actions)))
+    query_fns['first N (state,current_action) visits'] = lambda : nvisits[current_state][current_action] < (max_num_queries * (.1 / query_cost) / (len(states) * len(current_actions)))
 #query_probability_decay = 1 - 1. / max_num_queries 
 #query_fns['decaying probability'] = lambda : np.random.binomial(1, query_probability_decay**step)
 #query_fns['every time'] = lambda : True
@@ -173,17 +135,17 @@ if not our_hack:
 
 # query based on number of state visits:
 #query_fns['prob = proportion of state visits'] = lambda : np.random.binomial(1, (sum(nvisits[current_state]) + 50) / (sum(nvisits) + 50. * len(states)))
-#query_fns['prob = proportion of state-action visits'] = lambda : np.random.binomial(1, (sum(nvisits[current_state][action]) + 10) / (sum(nvisits) + 10. * len(states) * len(actions)))
+#query_fns['prob = proportion of state-current_action visits'] = lambda : np.random.binomial(1, (sum(nvisits[current_state][current_action]) + 10) / (sum(nvisits) + 10. * len(states) * len(current_actions)))
 
 # query based on expected reward
-#query_fns['geq than average expected reward'] = lambda : expected_reward(current_state, action) >= mean([expected_reward(s,a) for s in states for a in actions])
+#query_fns['geq than average expected reward'] = lambda : expected_reward(current_state, current_action) >= mean([expected_reward(s,a) for s in states for a in current_actions])
 # this explores more where there's more to explore!
 if our_hack:
-    query_fns['proportion of expected reward'] = lambda : np.random.binomial(1, expected_reward(current_state, action) / sum(expected_reward(s,a) for s in states for a in actions))
+    query_fns['proportion of expected reward'] = lambda : np.random.binomial(1, expected_reward(current_state, current_action) / sum(expected_reward(s,a) for s in states for a in current_actions))
 
 # query based on expected reward
-#query_fns['geq than average Q'] = lambda : Q_values[current_state][action] >= mean(Q_values)
-#query_fns['proportion of Q'] = lambda : np.random.binomial(1, (Q_values[current_state][action] + 1) / (sum(Q_values) + 1))
+#query_fns['geq than average Q'] = lambda : Q_values[current_state][current_action] >= mean(Q_values)
+#query_fns['proportion of Q'] = lambda : np.random.binomial(1, (Q_values[current_state][current_action] + 1) / (sum(Q_values) + 1))
 
 # query based on entropy of P(s):
 # TODO: we want this to actually depend on the state we're in, otherwise, it seems to mostly just scale with sqrt(nvisits)
@@ -195,12 +157,12 @@ if our_hack:
 #################################################################
 # LEARNING
 
-def update_q(state0, action, state1, reward, query): 
-    if not query: 
-        reward = expected_reward(state0, action)
-    old = Q_values[state0][action] 
+def update_q(state0, current_action, state1, reward, query): 
+    if query: 
+        reward = expected_reward(state0, current_action)
+    old = Q_values[state0][current_action] 
     new = reward + gamma*np.max(Q_values[state1])
-    Q_values[state0][action] = (1-learning_rate)*old + learning_rate*new
+    Q_values[state0][current_action] = (1-learning_rate)*old + learning_rate*new
 
 
 
@@ -237,59 +199,47 @@ for name,query_fn in query_fns.items():
         total_reward = 0
 
         #import itertools
-        #print [ireward_entropy(s,a) for (s,a) in itertools.product(states, actions)]
+        #print [ireward_entropy(s,a) for (s,a) in itertools.product(states, current_actions)]
 
         for step in range(num_steps):
-            #state_counts[state] += 1
-            action = np.argmax(Q_values[current_state])
+            current_action = np.argmax(Q_values[current_state])
             if np.random.binomial(1, epsilon): # take a random action
-                action = np.argmax(np.random.multinomial(1, [.2, .2, .2, .2, .2]))
-            nvisits[current_state][action] += 1
+                current_action = np.argmax(np.random.multinomial(1, [.2, .2, .2, .2, .2]))
+            nvisits[current_state][current_action] += 1
             reward = np.random.binomial(1, reward_probabilities[current_state])
             total_reward += reward 
             query = query_fn()
             if query:
-                nqueries[current_state][action] += 1
+                nqueries[current_state][current_action] += 1
                 # TODO: naming these two
-                total_r_observed[current_state][action] += reward
+                observed_rewards[current_state][current_action] += reward
 
             old_state = current_state
-            if np.random.binomial(1, prob_random_move): # action has random effect
-                current_state = next_state(current_state, np.argmax(np.random.multinomial(1, [.2,.2,.2,.2,.2])))
-            else:
-                current_state = next_state(current_state, action)
             if np.random.binomial(1, prob_random_reset): # reset to initial state
                 current_state = 0
 
             #simple q-learner 
-            update_q(old_state, action, current_state, reward, query)
+            update_q(old_state, current_action, current_state, reward, query)
 
-        total_observed_reward = sum([ sum(r_observed) for r_observed in total_r_observed])
+        total_observed_rewards = sum([ sum(r_observed) for r_observed in observed_rewards])
         total_nqueries = sum([ sum(nqueries_s) for nqueries_s in nqueries])
         total_query_cost = query_cost * total_nqueries
         performance = total_reward - total_query_cost
 
-        if 0:#printing:
-            print "total_reward =", total_reward
-            print "total_observed_reward =", total_observed_reward
-            print "total_nqueries =", total_nqueries
-            print "performance =", performance
-            print ''
+        print "total_reward =", total_reward
+        print "total_observed_reward =", total_observed_rewards
         print "total_nqueries =", total_nqueries
         print "performance =", performance
+        print ''
         performances.append(performance)
         print time.time() - t1
 
         save_str = '/u/kruegerd/CS188.1x-Project3/results/'
         save_str += 'total_nqueries_' + name + '__query_cost=' + str(query_cost) + '__budget=' + str(budget)
-        if fixed_mdp:
-            save_str += '__fixed_mdp'
         np.save(save_str, total_nqueries)
 
         save_str = '/u/kruegerd/CS188.1x-Project3/results/'
         save_str += 'performances_' + name + '__query_cost=' + str(query_cost) + '__budget=' + str(budget)
-        if fixed_mdp:
-            save_str += '__fixed_mdp'
         np.save(save_str, performances)
 
     #hist(performances, 50)
