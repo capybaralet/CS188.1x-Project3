@@ -22,6 +22,17 @@ The number of queries should be based on the total cost, NOT fixed.
 
 We should save more information (what??)
 
+large query cost is reflective of our scenario.
+
+look at performance over time.
+    e.g. reward / time-step vs. time-step
+
+The total benefit of information can be upper-bounded by ~75000.
+The total number of state-actions is ~300.
+You probable need ~100 queries to observe some reward, and the expected benefit would be more like 45000.
+So query cost of ~100 already makes it hard to do well...
+
+
 """
 
 # NTS: a lot of bugs caused by using "state" instead of "current_state"... maybe should renameNTS: a lot of bugs caused by using "state" instead of "current_state"... maybe should rename
